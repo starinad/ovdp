@@ -1,5 +1,4 @@
 import baseConfig from 'eslint-config-sdm';
-import gas from 'eslint-plugin-googleappsscript';
 
 export default [
     ...baseConfig,
@@ -7,9 +6,25 @@ export default [
         languageOptions: {
             globals: {
                 SpreadsheetApp: 'readonly',
-                Logger: 'readonly',
+                HtmlService: 'readonly',
                 Utilities: 'readonly',
+                Session: 'readonly',
+                UI: 'readonly',
+                Sheets: 'readonly',
+                Config: 'readonly',
+                Bonds: 'readonly',
+                Analytics: 'readonly',
+                Cashflow: 'readonly',
+                Coupons: 'readonly',
+                Utils: 'readonly',
+                Ladder: 'readonly',
             },
+        },
+    },
+    {
+        files: ['src/main.js'],
+        rules: {
+            'no-unused-vars': 'off',
         },
     },
 ];
