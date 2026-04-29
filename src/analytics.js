@@ -8,6 +8,8 @@ const Analytics = {
         const ladderSheet = ss.getSheetByName(Config.SHEET_NAMES.LADDER);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const maturitiesThisMonth = [];
+        let totalMaturitiesThisMonth = 0;
         let bonds = Bonds.getBondsData(bondsSheet);
         // set MATURED status for expired bonds
         const statusRange = bondsSheet.getRange(2, 4, bonds.length, 1);
@@ -18,6 +20,22 @@ const Analytics = {
                 bond.status = 'MATURED';
                 statuses[i][0] = 'MATURED';
                 hasChanges = true;
+            }
+
+            if (bond.status === 'ACTIVE' || bond.status === 'MATURED') {
+                const maturityDate = Utils.normalizeDate(bond.maturityDate);
+                const sameMonth =
+                    maturityDate.getFullYear() === today.getFullYear() &&
+                    maturityDate.getMonth() === today.getMonth();
+
+                if (sameMonth) {
+                    totalMaturitiesThisMonth += bond.faceValue * bond.quantity;
+
+                    maturitiesThisMonth.push({
+                        date: maturityDate,
+                        net: bond.faceValue * bond.quantity,
+                    });
+                }
             }
         });
         if (hasChanges) {
@@ -36,10 +54,8 @@ const Analytics = {
         let totalNetCouponIncome = 0;
         let totalScheduledGross = 0;
         let totalScheduledNet = 0;
-        const upcomingCouponsThisMonth = [];
+        const сouponsThisMonth = [];
         let totalCouponsThisMonth = 0;
-        const upcomingMaturitiesThisMonth = [];
-        let totalMaturitiesThisMonth = 0;
 
         const bondMap = {};
         activeBonds.forEach((bond) => {
@@ -50,21 +66,6 @@ const Analytics = {
             totalInvested += invested;
             totalFaceValue += face;
             weightedRateSum += invested * bond.interestRate;
-
-            const maturityDate = Utils.normalizeDate(bond.maturityDate);
-            const sameMonth =
-                maturityDate.getFullYear() === today.getFullYear() &&
-                maturityDate.getMonth() === today.getMonth();
-
-            if (sameMonth) {
-                totalMaturitiesThisMonth += bond.faceValue * bond.quantity;
-                if (maturityDate >= today) {
-                    upcomingMaturitiesThisMonth.push({
-                        date: maturityDate,
-                        net: bond.faceValue * bond.quantity,
-                    });
-                }
-            }
         });
 
         const weightedAvgYield =
@@ -106,6 +107,11 @@ const Analytics = {
                 payDate.getMonth() === today.getMonth();
             if (sameMonth) {
                 totalCouponsThisMonth += net;
+
+                сouponsThisMonth.push({
+                    date: payDate,
+                    net: net,
+                });
             }
 
             if (status === 'SCHEDULED') {
@@ -120,20 +126,13 @@ const Analytics = {
                 }
 
                 totalScheduledNet += adjustedNet;
-
-                if (sameMonth && payDate >= today) {
-                    upcomingCouponsThisMonth.push({
-                        date: payDate,
-                        net: net,
-                    });
-                }
             }
         }
         const r = (v) => Utils.bankersRound(v * 100) / 100;
-        upcomingCouponsThisMonth.sort((a, b) => a.date - b.date);
-        const upcomingCouponsText =
-            upcomingCouponsThisMonth.length > 0
-                ? upcomingCouponsThisMonth
+        сouponsThisMonth.sort((a, b) => a.date - b.date);
+        const сouponsThisMonthText =
+            сouponsThisMonth.length > 0
+                ? сouponsThisMonth
                       .map(
                           (c) =>
                               Utilities.formatDate(
@@ -147,10 +146,10 @@ const Analytics = {
                       .join('\n')
                 : 'N/A';
 
-        upcomingMaturitiesThisMonth.sort((a, b) => a.date - b.date);
-        const upcomingMaturitiesText =
-            upcomingMaturitiesThisMonth.length > 0
-                ? upcomingMaturitiesThisMonth
+        maturitiesThisMonth.sort((a, b) => a.date - b.date);
+        const maturitiesThisMonthText =
+            maturitiesThisMonth.length > 0
+                ? maturitiesThisMonth
                       .map(
                           (c) =>
                               Utilities.formatDate(
@@ -330,12 +329,12 @@ const Analytics = {
             ],
             ['', ''],
             ['── UPCOMING ──', ''],
-            ['Coupons This Month', upcomingCouponsText],
+            ['Coupons This Month', сouponsThisMonthText],
             [
                 'Total Coupons This Month',
                 Utils.formatUAH(r(totalCouponsThisMonth)),
             ],
-            ['Maturities This Month', upcomingMaturitiesText],
+            ['Maturities This Month', maturitiesThisMonthText],
             [
                 'Total Maturities This Month',
                 Utils.formatUAH(r(totalMaturitiesThisMonth)),
