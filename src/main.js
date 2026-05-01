@@ -23,7 +23,15 @@ function regenerateAllCoupons() {
 }
 
 function refreshCashflow() {
-    Cashflow.refreshCashflow();
+    Cashflow.refreshCashflow('ALL');
+}
+
+function refreshCashflowFuture() {
+    Cashflow.refreshCashflow('FUTURE');
+}
+
+function refreshCashflowRealized() {
+    Cashflow.refreshCashflow('REALIZED');
 }
 
 function refreshAnalytics() {

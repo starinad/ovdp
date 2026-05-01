@@ -9,6 +9,8 @@ const UI = {
             .addItem('🔄 Regenerate All Coupons', 'regenerateAllCoupons')
             .addSeparator()
             .addItem('📊 Refresh Cashflow', 'refreshCashflow')
+            .addItem('📊 Refresh Cashflow Future', 'refreshCashflowFuture')
+            .addItem('📊 Refresh Cashflow Realized', 'refreshCashflowRealized')
             .addItem('📈 Refresh Analytics', 'refreshAnalytics')
             .addItem('🔁 Refresh Everything', 'refreshAll')
             .addSeparator()

@@ -1,25 +1,29 @@
 // eslint-disable-next-line no-unused-vars
 const Cashflow = {
-    refreshCashflow() {
+    refreshCashflow(mode = 'ALL') {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
         const couponsSheet = ss.getSheetByName(Config.SHEET_NAMES.COUPONS);
         const bondsSheet = ss.getSheetByName(Config.SHEET_NAMES.BONDS);
         const cashflowSheet = ss.getSheetByName(Config.SHEET_NAMES.CASHFLOW);
 
         // Clear existing cashflow data
-        if (cashflowSheet.getLastRow() > 1) {
+        if (cashflowSheet.getMaxRows() > 1) {
             cashflowSheet
                 .getRange(
                     2,
                     1,
-                    cashflowSheet.getLastRow() - 1,
+                    cashflowSheet.getMaxRows() - 1,
                     Config.CASHFLOW_HEADERS.length,
                 )
-                .clearContent();
+                .clearContent()
+                .setFontWeight('normal')
+                .setFontStyle('normal')
+                .setBackground(null);
         }
 
         const couponsData = couponsSheet.getDataRange().getValues();
         const bondsData = bondsSheet.getDataRange().getValues();
+        const today = Utils.normalizeDate(new Date());
 
         // Aggregate coupons by month
         const monthlyMap = {};
@@ -30,8 +34,15 @@ const Cashflow = {
             const status = row[12];
             if (status === 'CANCELLED' || !row[4]) continue;
 
-            const paymentDate = new Date(row[4]);
+            const paymentDate = Utils.normalizeDate(new Date(row[4]));
             const month = Utils.formatMonth(paymentDate);
+
+            const showCashflow =
+                mode === 'ALL' ||
+                (mode === 'FUTURE' && paymentDate >= today) ||
+                (mode === 'REALIZED' && paymentDate < today);
+
+            if (!showCashflow) continue;
 
             const gross = parseFloat(row[8]) || 0;
             const tax = parseFloat(row[9]) || 0;
@@ -60,7 +71,15 @@ const Cashflow = {
             const status = row[3];
             if (status === 'SOLD' || !row[12]) continue;
 
-            const maturityDate = new Date(row[12]);
+            const maturityDate = Utils.normalizeDate(new Date(row[12]));
+
+            const showCashflow =
+                mode === 'ALL' ||
+                (mode === 'FUTURE' && maturityDate >= today) ||
+                (mode === 'REALIZED' && maturityDate < today);
+
+            if (!showCashflow) continue;
+
             const month = Utils.formatMonth(maturityDate);
             const faceValue = parseFloat(row[4]) || 0;
             const quantity = parseInt(row[5]) || 0;
@@ -147,13 +166,15 @@ const Cashflow = {
         const values = range.getValues().map((r) => r[0]);
 
         const positive = values.filter((v) => v > 0);
-        const min = positive.length ? Math.min(...positive) : 0;
-        const max = positive.length ? Math.max(...values) : 0;
 
+        const min = positive.length ? Math.min(...positive) : 0;
+        const max = positive.length ? Math.max(...positive) : 0;
+        const lg = (x) => Math.log(x + 1);
         const backgrounds = values.map((v) => {
             if (max === min) return ['#fff7cc']; // fallback
 
-            const ratio = (v - min) / (max - min);
+            const ratio =
+                max === min ? 0 : (lg(v) - lg(min)) / (lg(max) - lg(min));
 
             // 🎨 Yellow → Red gradient
             let r = 255;
