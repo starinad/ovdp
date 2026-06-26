@@ -40,7 +40,7 @@ function refreshAnalytics() {
 
 function refreshAll() {
     Coupons.regenerateAllCoupons();
-    Cashflow.refreshCashflow();
+    Cashflow.refreshCashflow('FUTURE');
     Analytics.refreshAnalytics();
     SpreadsheetApp.getActiveSpreadsheet().toast(
         'All data refreshed!',
