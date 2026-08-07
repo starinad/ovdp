@@ -68,7 +68,7 @@ const Bonds = {
         }
 
         // Refresh computed sheets
-        Cashflow.refreshCashflow();
+        Cashflow.refreshCashflow('FUTURE');
         Analytics.refreshAnalytics();
 
         SpreadsheetApp.getActiveSpreadsheet().toast(

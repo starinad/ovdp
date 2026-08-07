@@ -154,13 +154,12 @@ const Cashflow = {
             summaryRange.offset(0, 1, 1, 6).setNumberFormat('#,##0.00');
         }
 
-        this._applyHeatmap(cashflowSheet, 2, rows.length);
+        this._applyHeatmap(cashflowSheet, 4, 2, rows.length);
+        this._applyHeatmap(cashflowSheet, 7, 2, rows.length);
     },
 
-    _applyHeatmap(sheet, startRow, numRows) {
+    _applyHeatmap(sheet, col, startRow, numRows) {
         if (numRows === 0) return;
-
-        const col = 7; // Total Net Cashflow (G)
 
         const range = sheet.getRange(startRow, col, numRows, 1);
         const values = range.getValues().map((r) => r[0]);
