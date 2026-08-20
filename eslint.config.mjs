@@ -18,6 +18,7 @@ export default [
                 Coupons: 'readonly',
                 Utils: 'readonly',
                 Ladder: 'readonly',
+                Logger: 'readonly',
             },
         },
     },

@@ -156,6 +156,118 @@ const Cashflow = {
 
         this._applyHeatmap(cashflowSheet, 4, 2, rows.length);
         this._applyHeatmap(cashflowSheet, 7, 2, rows.length);
+
+        // Build the available-bonds coupon opportunity table in columns L, M, N
+        this._refreshAvailableCouponsTable(cashflowSheet);
+    },
+
+    _refreshAvailableCouponsTable(cashflowSheet) {
+        const COL_START = 12; // column L
+
+        // Clear previous data in columns L:N (keep row 1 for header)
+        const maxRows = cashflowSheet.getMaxRows();
+        if (maxRows > 1) {
+            cashflowSheet
+                .getRange(1, COL_START, maxRows, 3)
+                .clearContent()
+                .setFontWeight('normal')
+                .setBackground(null)
+                .setNumberFormat('@');
+        }
+
+        // Write header
+        const headerRange = cashflowSheet.getRange(1, COL_START, 1, 3);
+        headerRange.setValues([['Month', 'ISIN', 'Maturity']]);
+        headerRange.setFontWeight('bold');
+
+        // Load bond catalogue from config
+        let bondsJson;
+        try {
+            bondsJson = Config.getConfig().bondsJson;
+            if (typeof bondsJson === 'string') {
+                bondsJson = JSON.parse(bondsJson);
+            }
+        } catch (e) {
+            Logger.log(
+                '_refreshAvailableCouponsTable: failed to parse bondsJson – ' +
+                    e,
+            );
+            return;
+        }
+
+        // bondsJson may be a wrapper object with a `data` array (matches the
+        // example payload) or a plain array of bond objects.
+        const bonds = Array.isArray(bondsJson)
+            ? bondsJson
+            : bondsJson.data || [];
+
+        if (!bonds.length) return;
+
+        // Helper: parse "DD.MM.YYYY" → Date
+        const parseDMY = (str) => {
+            if (!str) return null;
+            const parts = str.split('.');
+            if (parts.length !== 3) return null;
+            return new Date(
+                parseInt(parts[2], 10),
+                parseInt(parts[1], 10) - 1,
+                parseInt(parts[0], 10),
+            );
+        };
+
+        // Helper: format Date → "YYYY-MM"
+        const toYearMonth = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            return `${y}-${m}`;
+        };
+
+        // Helper: format Date → "YYYY-MM-DD"
+        const toYMD = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
+
+        // Build one row per (coupon month, bond) combination.
+        // Each bond can appear multiple times — once per distinct coupon month.
+        const tableRows = []; // [ [month, isin, maturityYMD], ... ]
+
+        for (const bond of bonds) {
+            const isin = bond.isin;
+            const maturityDate = parseDMY(bond.maturity);
+            if (!maturityDate || !isin || bond.currency !== 'UAH') continue;
+
+            const maturityYMD = toYMD(maturityDate);
+
+            // Collect distinct coupon months for this bond (exclude Погашення)
+            const couponMonthSet = new Set();
+            for (const coupon of bond.coupons || []) {
+                if (coupon.type === 'Погашення') continue;
+                const pd = parseDMY(coupon.paymentDate);
+                if (!pd) continue;
+                couponMonthSet.add(toYearMonth(pd));
+            }
+
+            for (const month of couponMonthSet) {
+                tableRows.push([month, isin, maturityYMD]);
+            }
+        }
+
+        if (!tableRows.length) return;
+
+        // Sort: primary = Month (lexicographic YYYY-MM), secondary = Maturity (YYYY-MM-DD)
+        tableRows.sort((a, b) => {
+            if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
+            return a[2] < b[2] ? -1 : 1;
+        });
+
+        // Write to sheet starting at L2
+        cashflowSheet
+            .getRange(2, COL_START, tableRows.length, 3)
+            .setValues(tableRows)
+            .setNumberFormat('@'); // force text so dates are not auto-converted
     },
 
     _applyHeatmap(sheet, col, startRow, numRows) {
@@ -170,15 +282,14 @@ const Cashflow = {
         const max = positive.length ? Math.max(...positive) : 0;
         const lg = (x) => Math.log(x + 1);
         const backgrounds = values.map((v) => {
-            if (max === min) return ['#fff7cc']; // fallback
+            if (max === min) return ['#fff7cc'];
 
             const ratio =
                 max === min ? 0 : (lg(v) - lg(min)) / (lg(max) - lg(min));
 
-            // 🎨 Yellow → Red gradient
             let r = 255;
-            let g = Math.round(255 - ratio * 180); // уменьшаем зелёный
-            let b = Math.round(200 - ratio * 200); // уменьшаем синий
+            let g = Math.round(255 - ratio * 180);
+            let b = Math.round(200 - ratio * 200);
 
             return [`rgb(${r},${g},${Math.max(b, 0)})`];
         });

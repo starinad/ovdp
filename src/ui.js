@@ -19,7 +19,7 @@ const UI = {
     },
 
     showAddBondDialog() {
-        const config = this._getConfig();
+        const config = Config.getConfig();
         const html = HtmlService.createHtmlOutput(this._getAddBondHtml(config))
             .setWidth(520)
             .setHeight(680)
@@ -55,38 +55,6 @@ const UI = {
             }
             Bonds.deleteBond(bondId);
         }
-    },
-
-    _getConfig() {
-        const ss = SpreadsheetApp.getActiveSpreadsheet();
-        const sheet = ss.getSheetByName(Config.SHEET_NAMES.CONFIG);
-
-        if (!sheet) {
-            return {
-                defaultTaxRate: 0,
-                defaultDayCount: 'ACT/365',
-                defaultFrequency: 'Semi-Annual',
-                defaultCurrency: 'UAH',
-            };
-        }
-
-        const data = sheet.getDataRange().getValues();
-        const config = {};
-
-        for (let i = 1; i < data.length; i++) {
-            const key = data[i][0];
-            const value = data[i][1];
-            if (key.includes('Tax Rate'))
-                config.defaultTaxRate = parseFloat(value) || 0;
-            if (key.includes('Day Count'))
-                config.defaultDayCount = value || 'ACT/365';
-            if (key.includes('Coupon Frequency'))
-                config.defaultFrequency = value || 'Semi-Annual';
-            if (key.includes('Currency'))
-                config.defaultCurrency = value || 'UAH';
-        }
-
-        return config;
     },
 
     _getAddBondHtml(config) {
