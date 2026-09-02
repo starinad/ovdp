@@ -251,7 +251,12 @@ const Cashflow = {
             }
 
             for (const month of couponMonthSet) {
-                tableRows.push([month, isin, maturityYMD]);
+                tableRows.push([
+                    month,
+                    isin,
+                    maturityYMD,
+                    bond.sellYield ? bond.sellYield + '%' : 'n/a ',
+                ]);
             }
         }
 
@@ -265,7 +270,7 @@ const Cashflow = {
 
         // Write to sheet starting at L2
         cashflowSheet
-            .getRange(2, COL_START, tableRows.length, 3)
+            .getRange(2, COL_START, tableRows.length, 4)
             .setValues(tableRows)
             .setNumberFormat('@'); // force text so dates are not auto-converted
     },
