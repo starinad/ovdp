@@ -6,6 +6,7 @@ export default [
         languageOptions: {
             globals: {
                 SpreadsheetApp: 'readonly',
+                UrlFetchApp: 'readonly',
                 HtmlService: 'readonly',
                 Utilities: 'readonly',
                 Session: 'readonly',

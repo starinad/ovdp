@@ -182,19 +182,67 @@ const Cashflow = {
         ]);
         headerRange.setFontWeight('bold');
 
-        // Load bond catalogue from config
-        let bondsJson;
-        try {
-            bondsJson = Config.getConfig().bondsJson;
-            if (typeof bondsJson === 'string') {
-                bondsJson = JSON.parse(bondsJson);
+        // Prefer the bond catalogue from config; fall back to fetching it
+        // live from Privat24. The bargaining endpoint rejects a hardcoded
+        // xref because it expires, so create a fresh session first: init
+        // issues a pubkey cookie together with the xref, and the bonds call
+        // must replay that cookie.
+        let bondsJson = Config.getConfig().bondsJson;
+        if (typeof bondsJson === 'string') {
+            bondsJson = JSON.parse(bondsJson);
+        }
+        const configBonds = Array.isArray(bondsJson)
+            ? bondsJson
+            : (bondsJson && bondsJson.data) || [];
+
+        if (!configBonds.length) {
+            bondsJson = undefined;
+        }
+
+        if (!bondsJson) {
+            try {
+                const initResponse = UrlFetchApp.fetch(
+                    'https://next.privat24.ua/api/p24/init',
+                    {
+                        method: 'post',
+                        contentType: 'application/json',
+                        payload: JSON.stringify({}),
+                    },
+                );
+                const initJson = JSON.parse(initResponse.getContentText());
+                const xref = initJson.data && initJson.data.xref;
+                if (!xref) {
+                    throw new Error('init returned no xref');
+                }
+                const allHeaders = initResponse.getAllHeaders();
+                const setCookieKey = Object.keys(allHeaders).find(
+                    (k) => k.toLowerCase() === 'set-cookie',
+                );
+                const pubkey = String(
+                    setCookieKey ? allHeaders[setCookieKey] : '',
+                ).split(';')[0];
+
+                const response = UrlFetchApp.fetch(
+                    'https://next.privat24.ua/api/p24/pub/bonds',
+                    {
+                        method: 'post',
+                        contentType: 'application/json',
+                        headers: { Cookie: pubkey },
+                        payload: JSON.stringify({
+                            action: 'bargaining',
+                            xref,
+                            _: Date.now(),
+                        }),
+                    },
+                );
+                bondsJson = JSON.parse(response.getContentText());
+            } catch (e) {
+                Logger.log(
+                    '_refreshAvailableCouponsTable: failed to fetch bonds – ' +
+                        e,
+                );
+                return;
             }
-        } catch (e) {
-            Logger.log(
-                '_refreshAvailableCouponsTable: failed to parse bondsJson – ' +
-                    e,
-            );
-            return;
         }
 
         // bondsJson may be a wrapper object with a `data` array (matches the

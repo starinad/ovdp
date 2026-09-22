@@ -106,8 +106,13 @@ const Config = {
                 config.defaultFrequency = value || 'Semi-Annual';
             if (key.includes('Currency'))
                 config.defaultCurrency = value || 'UAH';
-            if (key.includes('Bonds JSON'))
-                config.bondsJson = JSON.parse(value) || { data: [] };
+            if (key.includes('Bonds JSON')) {
+                try {
+                    config.bondsJson = JSON.parse(value) || { data: [] };
+                } catch {
+                    config.bondsJson = { data: [] };
+                }
+            }
         }
 
         return config;
