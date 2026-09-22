@@ -240,6 +240,7 @@ const Cashflow = {
             const isin = bond.isin;
             const maturityDate = parseDMY(bond.maturity);
             if (!maturityDate || !isin || bond.currency !== 'UAH') continue;
+            if (!bond.sellPrice) continue;
 
             const maturityYMD = toYMD(maturityDate);
 
