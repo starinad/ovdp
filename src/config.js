@@ -96,17 +96,17 @@ const Config = {
         const config = {};
 
         for (let i = 1; i < data.length; i++) {
-            const key = data[i][0];
+            const key = String(data[i][0] || '').trim();
             const value = data[i][1];
-            if (key.includes('Tax Rate'))
+            if (key === 'Default Tax Rate (%)')
                 config.defaultTaxRate = parseFloat(value) || 0;
-            if (key.includes('Day Count'))
+            if (key === 'Default Day Count')
                 config.defaultDayCount = value || 'ACT/365';
-            if (key.includes('Coupon Frequency'))
+            if (key === 'Default Coupon Frequency')
                 config.defaultFrequency = value || 'Semi-Annual';
-            if (key.includes('Currency'))
+            if (key === 'Default Currency')
                 config.defaultCurrency = value || 'UAH';
-            if (key.includes('Bonds JSON')) {
+            if (key === 'Bonds JSON') {
                 try {
                     config.bondsJson = JSON.parse(value) || { data: [] };
                 } catch {

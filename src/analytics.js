@@ -370,7 +370,7 @@ const Analytics = {
         const today = Utils.normalizeDate(new Date());
         const flows = [];
 
-        // ❌ sell
+        // ❌ buy (capital outflow)
         bonds.forEach((bond) => {
             const invested =
                 (bond.purchasePrice + bond.accruedInterest) * bond.quantity;
@@ -391,7 +391,7 @@ const Analytics = {
             }
         });
 
-        // ✅ buy
+        // ✅ coupons (income inflow)
         for (let i = 1; i < couponsData.length; i++) {
             const row = couponsData[i];
             const status = row[12];
