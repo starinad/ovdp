@@ -164,11 +164,11 @@ const Cashflow = {
     _refreshAvailableCouponsTable(cashflowSheet) {
         const COL_START = 12; // column L
 
-        // Clear previous data in columns L:N (keep row 1 for header)
+        // Clear previous data in columns L:P (keep row 1 for header)
         const maxRows = cashflowSheet.getMaxRows();
         if (maxRows > 1) {
             cashflowSheet
-                .getRange(1, COL_START, maxRows, 3)
+                .getRange(1, COL_START, maxRows, 5)
                 .clearContent()
                 .setFontWeight('normal')
                 .setBackground(null)
@@ -176,8 +176,10 @@ const Cashflow = {
         }
 
         // Write header
-        const headerRange = cashflowSheet.getRange(1, COL_START, 1, 3);
-        headerRange.setValues([['Month', 'ISIN', 'Maturity']]);
+        const headerRange = cashflowSheet.getRange(1, COL_START, 1, 5);
+        headerRange.setValues([
+            ['Coupon', 'ISIN', 'Maturity', 'Rate', 'Price'],
+        ]);
         headerRange.setFontWeight('bold');
 
         // Load bond catalogue from config
@@ -256,6 +258,7 @@ const Cashflow = {
                     isin,
                     maturityYMD,
                     bond.sellYield ? bond.sellYield + '%' : 'n/a ',
+                    bond.sellPrice,
                 ]);
             }
         }
@@ -270,7 +273,7 @@ const Cashflow = {
 
         // Write to sheet starting at L2
         cashflowSheet
-            .getRange(2, COL_START, tableRows.length, 4)
+            .getRange(2, COL_START, tableRows.length, 5)
             .setValues(tableRows)
             .setNumberFormat('@'); // force text so dates are not auto-converted
     },

@@ -10,6 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
+    "@google/clasp": "^3.4.1",
     "eslint": "^9.39.4",
     "eslint-config-sdm": "^1.2.0"
   }
