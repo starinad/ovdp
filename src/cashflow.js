@@ -172,7 +172,8 @@ const Cashflow = {
                 .clearContent()
                 .setFontWeight('normal')
                 .setBackground(null)
-                .setNumberFormat('@');
+                .setNumberFormat('@')
+                .clearNote();
         }
 
         // Write header
@@ -276,6 +277,40 @@ const Cashflow = {
         // Each bond can appear multiple times — once per distinct coupon month.
         const tableRows = []; // [ [month, isin, maturityYMD], ... ]
 
+        // Per-ISIN popup: full coupon schedule + price, attached as a note
+        // to the ISIN cell (shown on click/hover in Sheets).
+        const noteByIsin = {};
+
+        const couponNote = (bond) => {
+            const lines = [
+                `ISIN: ${bond.isin}`,
+                `Maturity: ${bond.maturity}`,
+                `Sell price: ${Utils.formatUAH(bond.sellPrice)}`,
+            ];
+            if (bond.sellYield) {
+                lines.push(`Sell yield: ${bond.sellYield}%`);
+            }
+
+            const coupons = (bond.coupons || [])
+                .map((c) => ({ ...c, parsed: parseDMY(c.paymentDate) }))
+                .filter((c) => c.parsed)
+                .sort((a, b) => a.parsed - b.parsed);
+
+            if (coupons.length) {
+                lines.push('', 'Coupons:');
+                for (const c of coupons) {
+                    const kind = c.type === 'Погашення' ? 'Погашення ' : '';
+                    lines.push(
+                        `${c.paymentDate} — ${kind}${Utils.formatUAH(c.value)}`,
+                    );
+                }
+            } else {
+                lines.push('', 'No coupons');
+            }
+
+            return lines.join('\n');
+        };
+
         for (const bond of bonds) {
             const isin = bond.isin;
             const maturityDate = parseDMY(bond.maturity);
@@ -293,7 +328,10 @@ const Cashflow = {
                 couponMonthSet.add(toYearMonth(pd));
             }
 
+            const note = couponNote(bond);
+
             for (const month of couponMonthSet) {
+                noteByIsin[isin] = note;
                 tableRows.push([
                     month,
                     isin,
@@ -317,6 +355,11 @@ const Cashflow = {
             .getRange(2, COL_START, tableRows.length, 5)
             .setValues(tableRows)
             .setNumberFormat('@'); // force text so dates are not auto-converted
+
+        // Attach the coupon-schedule popup to each ISIN cell
+        cashflowSheet
+            .getRange(2, COL_START + 1, tableRows.length, 1)
+            .setNotes(tableRows.map((r) => [noteByIsin[r[1]] || '']));
     },
 
     _applyHeatmap(sheet, col, startRow, numRows) {
