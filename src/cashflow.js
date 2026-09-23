@@ -272,14 +272,6 @@ const Cashflow = {
             return `${y}-${m}`;
         };
 
-        // Helper: format Date → "YYYY-MM-DD"
-        const toYMD = (date) => {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        };
-
         // Build one row per (coupon month, bond) combination.
         // Each bond can appear multiple times — once per distinct coupon month.
         const tableRows = []; // [ [month, isin, maturityYMD], ... ]
@@ -290,7 +282,7 @@ const Cashflow = {
             if (!maturityDate || !isin || bond.currency !== 'UAH') continue;
             if (!bond.sellPrice) continue;
 
-            const maturityYMD = toYMD(maturityDate);
+            const maturityYM = toYearMonth(maturityDate);
 
             // Collect distinct coupon months for this bond (exclude Погашення)
             const couponMonthSet = new Set();
@@ -305,7 +297,7 @@ const Cashflow = {
                 tableRows.push([
                     month,
                     isin,
-                    maturityYMD,
+                    maturityYM,
                     bond.sellYield ? bond.sellYield + '%' : 'n/a ',
                     bond.sellPrice,
                 ]);
