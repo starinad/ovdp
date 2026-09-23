@@ -54,6 +54,16 @@ const Sheets = {
                     'Monthly, Quarterly, Semi-Annual, Annual',
                 ],
                 ['Default Currency', 'UAH', 'Currency code'],
+                [
+                    'Bonds JSON',
+                    '',
+                    'https://next.privat24.ua/bonds/list -> F12 -> Network -> Fetch/XHR -> bonds -> Copy Response',
+                ],
+                [
+                    'Bonds Snapshot Timestamp',
+                    '',
+                    'Timestamp of the last bonds snapshot',
+                ],
             ]);
         }
 

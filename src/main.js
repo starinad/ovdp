@@ -38,6 +38,10 @@ function refreshAnalytics() {
     Analytics.refreshAnalytics();
 }
 
+function showCouponsDialog() {
+    UI.showCouponsDialog();
+}
+
 function refreshAll() {
     Coupons.regenerateAllCoupons();
     Cashflow.refreshCashflow('FUTURE');

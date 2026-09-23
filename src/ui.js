@@ -14,8 +14,41 @@ const UI = {
             .addItem('📈 Refresh Analytics', 'refreshAnalytics')
             .addItem('🔁 Refresh Everything', 'refreshAll')
             .addSeparator()
+            .addItem('💰 Coupons for Selected ISIN...', 'showCouponsDialog')
             .addItem('🗑️ Delete Bond...', 'showDeleteBondDialog')
             .addToUi();
+    },
+
+    showCouponsDialog() {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const cell = ss.getActiveRange().getCell(1, 1);
+        const isin = String(cell.getValue()).trim();
+
+        if (!isin || isin === 'ISIN') {
+            SpreadsheetApp.getUi().alert(
+                'Select an ISIN cell first (e.g. in column M of the Cashflow tab).',
+                'No ISIN Selected',
+            );
+            return;
+        }
+
+        const { bond, coupons } = Cashflow.getBondData(isin);
+        if (!coupons.length) {
+            SpreadsheetApp.getUi().alert(
+                `No coupon data found for ${isin}.`,
+                'No Data',
+            );
+            return;
+        }
+
+        const html = HtmlService.createHtmlOutput(
+            this._getCouponsHtml(isin, coupons, bond),
+        )
+            .setTitle('Bond Coupons')
+            .setWidth(560)
+            .setHeight(560);
+
+        SpreadsheetApp.getUi().showModalDialog(html, `Coupons — ${isin}`);
     },
 
     showAddBondDialog() {
@@ -55,6 +88,122 @@ const UI = {
             }
             Bonds.deleteBond(bondId);
         }
+    },
+
+    _getCouponsHtml(isin, coupons, bond) {
+        const fmt = (v) => Utils.formatUAH(v).replace(/\u00a0/g, ' ');
+        const rowsHtml = coupons
+            .map((c) => {
+                const isMaturity = c.type === 'Погашення';
+                return (
+                    '<tr>' +
+                    `<td>${c.paymentDate}</td>` +
+                    `<td class="kind">${isMaturity ? 'Погашення' : 'Купон'}</td>` +
+                    `<td class="num">${fmt(c.value)}</td>` +
+                    `<td class="num">${isMaturity ? '—' : fmt(c.value)}</td>` +
+                    '</tr>'
+                );
+            })
+            .join('\n');
+
+        const meta = [];
+        if (bond && bond.maturity) {
+            meta.push(`<div>Maturity: <b>${bond.maturity}</b></div>`);
+        }
+        if (bond && bond.sellPrice) {
+            meta.push(`<div>Sell price: <b>${fmt(bond.sellPrice)}</b></div>`);
+        }
+        if (bond && bond.sellYield) {
+            meta.push(`<div>Sell yield: <b>${bond.sellYield}%</b></div>`);
+        }
+
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Google Sans', Arial, sans-serif; padding: 20px;
+           background: #f8f9fa; }
+    h2 { color: #1a73e8; margin: 0 0 16px; font-size: 18px; }
+    .meta { margin: 12px 0 18px; font-size: 13px; color: #3c4043; }
+    .qty-row { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
+    .qty-row label { font-size: 13px; font-weight: 500; color: #5f6368; }
+    .qty-row input { width: 130px; padding: 6px 10px; border: 1px solid #dadce0;
+                     border-radius: 6px; font-size: 14px; text-align: right; }
+    .qty-row input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px #1a73e820; }
+    .buy-cost { margin: 4px 0 18px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #e8f0fe; color: #174ea6; font-size: 12px; font-weight: 600;
+         text-align: left; padding: 8px 12px; }
+    td { padding: 8px 12px; border-bottom: 1px solid #e8eaed; font-size: 13px; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.kind { color: #80868b; }
+    tr:nth-child(even) td { background: #f1f3f4; }
+    .close-row { margin-top: 18px; }
+    .btn { padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer;
+           font-weight: 500; }
+    .btn-secondary { background: #e8eaed; color: #3c4043; }
+  </style>
+</head>
+<body>
+  <h2>${isin}</h2>
+  <div class="meta">${meta.join('')}</div>
+
+  <div class="qty-row">
+    <label for="qty">Quantity:</label>
+    <input id="qty" type="number" min="0" step="1" value="1">
+    <span id="qtyHint" class="hint" style="color:#80868b;font-size:12px"></span>
+  </div>
+  <div class="meta buy-cost">Buy cost: <b id="buyCost">—</b></div>
+  <div class="meta buy-cost">Profit: <b id="profit">—</b></div>
+
+  <table id="couponsTable">
+    <thead>
+      <tr>
+        <th>Payment Date</th>
+        <th>Type</th>
+        <th>Per Unit (UAH)</th>
+        <th>Total (UAH)</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <div class="close-row">
+    <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+  </div>
+
+  <script>
+    const couponValues = [${coupons.map((c) => c.value || 0).join(',')}];
+    const sellPrice = ${(bond && bond.sellPrice) || 0};
+    const fmt = (v) => v.toLocaleString('uk-UA', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const totalPayout = couponValues.reduce((a, b) => a + b, 0);
+    const update = () => {
+      const qty = Math.max(0, parseInt(document.getElementById('qty').value) || 0);
+      const cells = document.querySelectorAll('#tbody tr td:nth-child(4)');
+      [...cells].forEach((td, i) => {
+        td.textContent = fmt(couponValues[i] * qty);
+      });
+      const profit = (totalPayout - sellPrice) * qty;
+      document.getElementById('buyCost').textContent = fmt(sellPrice * qty);
+      const profitEl = document.getElementById('profit');
+      profitEl.textContent = fmt(profit);
+      profitEl.style.color = profit < 0 ? '#c5221f' : '#188038';
+      document.getElementById('qtyHint').textContent =
+        qty === 0 ? 'Enter quantity to multiply' : 'per ' + qty + ' units';
+    };
+    update();
+    document.getElementById('qty').addEventListener('input', update);
+  </script>
+</body>
+</html>`;
     },
 
     _getAddBondHtml(config) {

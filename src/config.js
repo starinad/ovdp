@@ -79,6 +79,9 @@ const Config = {
         { header: 'Description', width: 400 },
     ],
 
+    BONDS_JSON_KEY: 'Bonds JSON',
+    BONDS_SNAPSHOT_KEY: 'Bonds Snapshot Timestamp',
+
     getConfig() {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
         const sheet = ss.getSheetByName(Config.SHEET_NAMES.CONFIG);
@@ -113,8 +116,32 @@ const Config = {
                     config.bondsJson = { data: [] };
                 }
             }
+            if (key === this.BONDS_SNAPSHOT_KEY) {
+                const ts = value ? new Date(value).getTime() : null;
+                config.bondsSnapshot = isNaN(ts) ? null : ts;
+            }
         }
 
         return config;
+    },
+
+    // Refreshes the Bonds JSON + Bonds Snapshot Timestamp values in place.
+    // Used by Cashflow.getLiveBonds to keep the catalogue fresh.
+    setBondsSnapshot(bondsJson, now) {
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+            this.SHEET_NAMES.CONFIG,
+        );
+        if (!sheet) return;
+
+        const data = sheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+            const key = String(data[i][0] || '').trim();
+            if (key === this.BONDS_JSON_KEY) {
+                sheet.getRange(i + 1, 2).setValue(JSON.stringify(bondsJson));
+            }
+            if (key === this.BONDS_SNAPSHOT_KEY) {
+                sheet.getRange(i + 1, 2).setValue(now);
+            }
+        }
     },
 };

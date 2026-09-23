@@ -161,6 +161,9 @@ const Cashflow = {
         this._refreshAvailableCouponsTable(cashflowSheet);
     },
 
+    CF_MATURITY: 'Погашення',
+    BONDS_TTL_MS: 12 * 60 * 60 * 1000, // 12h
+
     _refreshAvailableCouponsTable(cashflowSheet) {
         const COL_START = 12; // column L
 
@@ -183,74 +186,7 @@ const Cashflow = {
         ]);
         headerRange.setFontWeight('bold');
 
-        // Prefer the bond catalogue from config; fall back to fetching it
-        // live from Privat24. The bargaining endpoint rejects a hardcoded
-        // xref because it expires, so create a fresh session first: init
-        // issues a pubkey cookie together with the xref, and the bonds call
-        // must replay that cookie.
-        let bondsJson = Config.getConfig().bondsJson;
-        if (typeof bondsJson === 'string') {
-            bondsJson = JSON.parse(bondsJson);
-        }
-        const configBonds = Array.isArray(bondsJson)
-            ? bondsJson
-            : (bondsJson && bondsJson.data) || [];
-
-        if (!configBonds.length) {
-            bondsJson = undefined;
-        }
-
-        if (!bondsJson) {
-            try {
-                const initResponse = UrlFetchApp.fetch(
-                    'https://next.privat24.ua/api/p24/init',
-                    {
-                        method: 'post',
-                        contentType: 'application/json',
-                        payload: JSON.stringify({}),
-                    },
-                );
-                const initJson = JSON.parse(initResponse.getContentText());
-                const xref = initJson.data && initJson.data.xref;
-                if (!xref) {
-                    throw new Error('init returned no xref');
-                }
-                const allHeaders = initResponse.getAllHeaders();
-                const setCookieKey = Object.keys(allHeaders).find(
-                    (k) => k.toLowerCase() === 'set-cookie',
-                );
-                const pubkey = String(
-                    setCookieKey ? allHeaders[setCookieKey] : '',
-                ).split(';')[0];
-
-                const response = UrlFetchApp.fetch(
-                    'https://next.privat24.ua/api/p24/pub/bonds',
-                    {
-                        method: 'post',
-                        contentType: 'application/json',
-                        headers: { Cookie: pubkey },
-                        payload: JSON.stringify({
-                            action: 'bargaining',
-                            xref,
-                            _: Date.now(),
-                        }),
-                    },
-                );
-                bondsJson = JSON.parse(response.getContentText());
-            } catch (e) {
-                Logger.log(
-                    '_refreshAvailableCouponsTable: failed to fetch bonds – ' +
-                        e,
-                );
-                return;
-            }
-        }
-
-        // bondsJson may be a wrapper object with a `data` array (matches the
-        // example payload) or a plain array of bond objects.
-        const bonds = Array.isArray(bondsJson)
-            ? bondsJson
-            : bondsJson.data || [];
+        const bonds = this.getLiveBonds();
 
         if (!bonds.length) return;
 
@@ -277,40 +213,10 @@ const Cashflow = {
         // Each bond can appear multiple times — once per distinct coupon month.
         const tableRows = []; // [ [month, isin, maturityYMD], ... ]
 
-        // Per-ISIN popup: full coupon schedule + price, attached as a note
-        // to the ISIN cell (shown on click/hover in Sheets).
-        const noteByIsin = {};
-
-        const couponNote = (bond) => {
-            const lines = [
-                `ISIN: ${bond.isin}`,
-                `Maturity: ${bond.maturity}`,
-                `Sell price: ${Utils.formatUAH(bond.sellPrice)}`,
-            ];
-            if (bond.sellYield) {
-                lines.push(`Sell yield: ${bond.sellYield}%`);
-            }
-
-            const coupons = (bond.coupons || [])
-                .map((c) => ({ ...c, parsed: parseDMY(c.paymentDate) }))
-                .filter((c) => c.parsed)
-                .sort((a, b) => a.parsed - b.parsed);
-
-            if (coupons.length) {
-                lines.push('', 'Coupons:');
-                for (const c of coupons) {
-                    const kind = c.type === 'Погашення' ? 'Погашення ' : '';
-                    lines.push(
-                        `${c.paymentDate} — ${kind}${Utils.formatUAH(c.value)}`,
-                    );
-                }
-            } else {
-                lines.push('', 'No coupons');
-            }
-
-            return lines.join('\n');
-        };
-
+        // Per-ISIN coupon schedule (date, value, type), source for the cell
+        // note and the quantity dialog. `parsed` is the sortable Date.
+        const couponsByIsin = {};
+        const bondByIsin = {};
         for (const bond of bonds) {
             const isin = bond.isin;
             const maturityDate = parseDMY(bond.maturity);
@@ -328,10 +234,10 @@ const Cashflow = {
                 couponMonthSet.add(toYearMonth(pd));
             }
 
-            const note = couponNote(bond);
+            bondByIsin[isin] = bond;
+            couponsByIsin[isin] = this._sortedCoupons(bond.coupons || []);
 
             for (const month of couponMonthSet) {
-                noteByIsin[isin] = note;
                 tableRows.push([
                     month,
                     isin,
@@ -359,7 +265,158 @@ const Cashflow = {
         // Attach the coupon-schedule popup to each ISIN cell
         cashflowSheet
             .getRange(2, COL_START + 1, tableRows.length, 1)
-            .setNotes(tableRows.map((r) => [noteByIsin[r[1]] || '']));
+            .setNotes(
+                tableRows.map((r) => [
+                    this._couponNote(bondByIsin[r[1]], couponsByIsin[r[1]]),
+                ]),
+            );
+    },
+
+    _parseDMY(str) {
+        if (!str) return null;
+        const parts = str.split('.');
+        if (parts.length !== 3) return null;
+        return new Date(
+            parseInt(parts[2], 10),
+            parseInt(parts[1], 10) - 1,
+            parseInt(parts[0], 10),
+        );
+    },
+
+    // Coupons sorted by date; on the same date the maturity payment goes
+    // last so it reads as the final payment.
+    _sortedCoupons(couponsList) {
+        return (couponsList || [])
+            .map((c) => ({ ...c, parsed: this._parseDMY(c.paymentDate) }))
+            .filter((c) => c.parsed)
+            .sort((a, b) => {
+                const aT = a.parsed.getTime();
+                const bT = b.parsed.getTime();
+                if (aT !== bT) return aT - bT;
+                const aM = a.type === this.CF_MATURITY ? 1 : 0;
+                const bM = b.type === this.CF_MATURITY ? 1 : 0;
+                return aM - bM;
+            });
+    },
+
+    // Static note text for an ISIN cell (notes can't hold input fields).
+    _couponNote(bond, coupons) {
+        const lines = [
+            `ISIN: ${bond.isin}`,
+            `Maturity: ${bond.maturity}`,
+            `Sell price: ${Utils.formatUAH(bond.sellPrice)}`,
+        ];
+        if (bond.sellYield) {
+            lines.push(`Sell yield: ${bond.sellYield}%`);
+        }
+
+        if (coupons.length) {
+            lines.push('', 'Coupons:');
+            for (const c of coupons) {
+                const kind = c.type === this.CF_MATURITY ? 'Погашення ' : '';
+                lines.push(
+                    `${c.paymentDate} — ${kind}${Utils.formatUAH(c.value)}`,
+                );
+            }
+        } else {
+            lines.push('', 'No coupons');
+        }
+
+        return lines.join('\n');
+    },
+
+    // Bond + sorted coupon schedule for the dialog.
+    getBondData(isin) {
+        const bond = this.getLiveBonds().find((b) => b.isin === isin);
+        return {
+            bond,
+            coupons: bond ? this._sortedCoupons(bond.coupons || []) : [],
+        };
+    },
+
+    // Live Privat24 bond catalogue: serves the Config-sheet snapshot until it
+    // is older than `BONDS_TTL_MS`, then refetches and refreshes the snapshot
+    // (Bonds JSON + Bonds Snapshot Timestamp cells).
+    getLiveBonds() {
+        const config = Config.getConfig();
+        const cached = this._parseBonds(config.bondsJson);
+
+        if (
+            cached.length &&
+            config.bondsSnapshot &&
+            Date.now() - config.bondsSnapshot < this.BONDS_TTL_MS
+        ) {
+            return cached;
+        }
+
+        const fresh = this._fetchLiveBonds();
+        if (fresh.length) {
+            Config.setBondsSnapshot(fresh, new Date());
+            return fresh;
+        }
+
+        // Fetch failed: serve whatever cached data we have rather than nothing
+        return cached;
+    },
+
+    // Parses the Config snapshot (wrapper or plain array) into a plain array.
+    _parseBonds(bondsJson) {
+        if (typeof bondsJson === 'string') {
+            try {
+                bondsJson = JSON.parse(bondsJson);
+            } catch {
+                return [];
+            }
+        }
+        return Array.isArray(bondsJson)
+            ? bondsJson
+            : (bondsJson && bondsJson.data) || [];
+    },
+
+    _fetchLiveBonds() {
+        let bondsJson;
+        try {
+            const initResponse = UrlFetchApp.fetch(
+                'https://next.privat24.ua/api/p24/init',
+                {
+                    method: 'post',
+                    contentType: 'application/json',
+                    payload: JSON.stringify({}),
+                },
+            );
+            const initJson = JSON.parse(initResponse.getContentText());
+            const xref = initJson.data && initJson.data.xref;
+            if (!xref) {
+                throw new Error('init returned no xref');
+            }
+            const allHeaders = initResponse.getAllHeaders();
+            const setCookieKey = Object.keys(allHeaders).find(
+                (k) => k.toLowerCase() === 'set-cookie',
+            );
+            const pubkey = String(
+                setCookieKey ? allHeaders[setCookieKey] : '',
+            ).split(';')[0];
+
+            const response = UrlFetchApp.fetch(
+                'https://next.privat24.ua/api/p24/pub/bonds',
+                {
+                    method: 'post',
+                    contentType: 'application/json',
+                    headers: { Cookie: pubkey },
+                    payload: JSON.stringify({
+                        action: 'bargaining',
+                        xref,
+                        _: Date.now(),
+                    }),
+                },
+            );
+            bondsJson = JSON.parse(response.getContentText());
+        } catch (e) {
+            Logger.log('getLiveBonds: failed to fetch bonds – ' + e);
+            return [];
+        }
+
+        return this._parseBonds(bondsJson);
     },
 
     _applyHeatmap(sheet, col, startRow, numRows) {
