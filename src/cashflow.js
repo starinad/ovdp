@@ -100,6 +100,22 @@ const Cashflow = {
             monthlyMap[month].maturityCount++;
         }
 
+        // FUTURE mode always shows the current month, even when its coupons
+        // are already paid and nothing else remains in it.
+        if (mode === 'FUTURE') {
+            const currentMonth = Utils.formatMonth(today);
+            if (!monthlyMap[currentMonth]) {
+                monthlyMap[currentMonth] = {
+                    grossCoupon: 0,
+                    tax: 0,
+                    netCoupon: 0,
+                    maturity: 0,
+                    couponCount: 0,
+                    maturityCount: 0,
+                };
+            }
+        }
+
         // Sort by month and write
         const sortedMonths = Object.keys(monthlyMap).sort();
 
