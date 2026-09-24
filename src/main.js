@@ -2,6 +2,10 @@ function onOpen() {
     UI.setupMenu();
 }
 
+function onSelectionChange(e) {
+    Cashflow.highlightCashflowMonth(e);
+}
+
 function setupSheet() {
     Sheets.setupSheet();
 }

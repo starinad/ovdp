@@ -1,4 +1,3 @@
-// eslint-disable-next-line no-unused-vars
 const Cashflow = {
     refreshCashflow(mode = 'ALL') {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -175,6 +174,42 @@ const Cashflow = {
 
         // Build the available-bonds coupon opportunity table in columns L, M, N
         this._refreshAvailableCouponsTable(cashflowSheet);
+    },
+
+    // Highlights rows in the available-bonds table (L–P) whose coupon month
+    // matches the month of the currently selected Cashflow data cell (A–I).
+    highlightCashflowMonth(e) {
+        const sheet = e.range.getSheet();
+        if (sheet.getName() !== Config.SHEET_NAMES.CASHFLOW) return;
+        if (e.range.getNumRows() !== 1 || e.range.getNumColumns() !== 1) return;
+
+        const row = e.range.getRow();
+        const col = e.range.getColumn();
+        const inDataTable =
+            col >= 1 && col <= Config.CASHFLOW_HEADERS.length && row >= 2;
+        const value = inDataTable ? sheet.getRange(row, 1).getValue() : '';
+        const selected = /^\d{4}-\d{2}$/.test(value) ? value : '';
+
+        const lastRow = sheet.getLastRow();
+        if (lastRow < 2) return;
+
+        // Column L is the first column (Coupon) of the available-bonds table.
+        const bondsRange = sheet.getRange(2, 12, lastRow - 1, 5);
+        const couponMonths = bondsRange.getValues().map((r) => r[0]);
+        const highlight = [
+            '#b6d7a8',
+            '#b6d7a8',
+            '#b6d7a8',
+            '#b6d7a8',
+            '#b6d7a8',
+        ];
+        const plain = [null, null, null, null, null];
+
+        bondsRange.setBackgrounds(
+            couponMonths.map((m) =>
+                selected && m === selected ? highlight : plain,
+            ),
+        );
     },
 
     CF_MATURITY: 'Погашення',
