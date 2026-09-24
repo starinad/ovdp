@@ -41,7 +41,7 @@ const Sheets = {
 
         const configData = configSheet.getDataRange().getValues();
         if (configData.length <= 1) {
-            configSheet.getRange(2, 1, 4, 3).setValues([
+            configSheet.getRange(2, 1, 6, 3).setValues([
                 [
                     'Default Tax Rate (%)',
                     0,
@@ -70,11 +70,28 @@ const Sheets = {
         // Activate bonds sheet
         ss.setActiveSheet(ss.getSheetByName(Config.SHEET_NAMES.BONDS));
 
+        this.installBondDialogTrigger();
+
         SpreadsheetApp.getUi().alert(
             '✅ Setup Complete',
             'OVDP Manager is ready. Use the "💰 OVDP Manager" menu to add bonds.',
             SpreadsheetApp.getUi().ButtonSet.OK,
         );
+    },
+
+    installBondDialogTrigger() {
+        if (
+            !ScriptApp.getProjectTriggers().some(
+                (trigger) =>
+                    trigger.getHandlerFunction() ===
+                    'openBondDialogFromCheckbox',
+            )
+        ) {
+            ScriptApp.newTrigger('openBondDialogFromCheckbox')
+                .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
+                .onEdit()
+                .create();
+        }
     },
 
     _createOrGetSheet(ss, name, headers) {

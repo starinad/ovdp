@@ -19,10 +19,11 @@ const UI = {
             .addToUi();
     },
 
-    showCouponsDialog() {
+    showCouponsDialog(selectedIsin) {
         const ss = SpreadsheetApp.getActiveSpreadsheet();
-        const cell = ss.getActiveRange().getCell(1, 1);
-        const isin = String(cell.getValue()).trim();
+        const isin = String(
+            selectedIsin || ss.getActiveRange().getCell(1, 1).getValue(),
+        ).trim();
 
         if (!isin || isin === 'ISIN') {
             SpreadsheetApp.getUi().alert(

@@ -195,7 +195,7 @@ const Cashflow = {
         if (lastRow < 2) return;
 
         // Column L is the first column (Coupon) of the available-bonds table.
-        const bondsRange = sheet.getRange(2, 12, lastRow - 1, 5);
+        const bondsRange = sheet.getRange(2, 12, lastRow - 1, 6);
         const couponMonths = bondsRange.getValues().map((r) => r[0]);
         const highlight = [
             '#b6d7a8',
@@ -203,8 +203,9 @@ const Cashflow = {
             '#b6d7a8',
             '#b6d7a8',
             '#b6d7a8',
+            '#b6d7a8',
         ];
-        const plain = [null, null, null, null, null];
+        const plain = [null, null, null, null, null, null];
 
         bondsRange.setBackgrounds(
             couponMonths.map((m) =>
@@ -219,24 +220,26 @@ const Cashflow = {
     _refreshAvailableCouponsTable(cashflowSheet) {
         const COL_START = 12; // column L
 
-        // Clear previous data in columns L:P (keep row 1 for header)
+        // Clear previous data in columns L:Q (keep row 1 for header)
         const maxRows = cashflowSheet.getMaxRows();
         if (maxRows > 1) {
             cashflowSheet
-                .getRange(1, COL_START, maxRows, 5)
+                .getRange(1, COL_START, maxRows, 6)
                 .clearContent()
                 .setFontWeight('normal')
                 .setBackground(null)
                 .setNumberFormat('@')
+                .clearDataValidations()
                 .clearNote();
         }
 
         // Write header
-        const headerRange = cashflowSheet.getRange(1, COL_START, 1, 5);
+        const headerRange = cashflowSheet.getRange(1, COL_START, 1, 6);
         headerRange.setValues([
-            ['Coupon', 'ISIN', 'Maturity', 'Rate', 'Price'],
+            ['Coupon', 'ISIN', 'Open', 'Maturity', 'Rate', 'Price'],
         ]);
         headerRange.setFontWeight('bold');
+        cashflowSheet.setColumnWidth(COL_START + 2, 70);
 
         const bonds = this.getLiveBonds();
 
@@ -310,9 +313,15 @@ const Cashflow = {
 
         // Write to sheet starting at L2
         cashflowSheet
-            .getRange(2, COL_START, tableRows.length, 5)
-            .setValues(tableRows)
+            .getRange(2, COL_START, tableRows.length, 6)
+            .setValues(
+                tableRows.map((row) => [row[0], row[1], '', ...row.slice(2)]),
+            )
             .setNumberFormat('@'); // force text so dates are not auto-converted
+        cashflowSheet
+            .getRange(2, COL_START + 2, tableRows.length, 1)
+            .setNumberFormat('General')
+            .insertCheckboxes();
 
         // Attach the coupon-schedule popup to each ISIN cell
         cashflowSheet

@@ -6,6 +6,24 @@ function onSelectionChange(e) {
     Cashflow.highlightCashflowMonth(e);
 }
 
+function openBondDialogFromCheckbox(e) {
+    const range = e.range;
+    if (
+        range.getSheet().getName() !== Config.SHEET_NAMES.CASHFLOW ||
+        range.getColumn() !== 14 ||
+        range.getRow() < 2 ||
+        e.value !== 'TRUE'
+    ) {
+        return;
+    }
+
+    const sheet = range.getSheet();
+    const isin = String(sheet.getRange(range.getRow(), 13).getValue()).trim();
+    range.uncheck();
+    SpreadsheetApp.flush();
+    if (isin) UI.showCouponsDialog(isin);
+}
+
 function setupSheet() {
     Sheets.setupSheet();
 }

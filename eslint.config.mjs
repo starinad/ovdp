@@ -20,6 +20,7 @@ export default [
                 Utils: 'readonly',
                 Ladder: 'readonly',
                 Logger: 'readonly',
+                ScriptApp: 'readonly',
             },
         },
     },
