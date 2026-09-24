@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-unused-vars
 const Cashflow = {
     refreshCashflow(mode = 'ALL') {
         const ss = SpreadsheetApp.getActiveSpreadsheet();

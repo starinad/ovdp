@@ -108,7 +108,23 @@ const UI = {
 
         const meta = [];
         if (bond && bond.maturity) {
-            meta.push(`<div>Maturity: <b>${bond.maturity}</b></div>`);
+            const maturityDate = Cashflow._parseDMY(bond.maturity);
+            const today = new Date();
+            const months = maturityDate
+                ? Math.max(
+                      0,
+                      (maturityDate.getFullYear() - today.getFullYear()) * 12 +
+                          maturityDate.getMonth() -
+                          today.getMonth(),
+                  )
+                : null;
+            const duration =
+                months === null
+                    ? ''
+                    : ` (${Math.floor(months / 12)}y ${months % 12}m)`;
+            meta.push(
+                `<div>Maturity: <b>${bond.maturity}${duration}</b></div>`,
+            );
         }
         if (bond && bond.sellPrice) {
             meta.push(`<div>Sell price: <b>${fmt(bond.sellPrice)}</b></div>`);
@@ -133,7 +149,7 @@ const UI = {
     .qty-row input { width: 130px; padding: 6px 10px; border: 1px solid #dadce0;
                      border-radius: 6px; font-size: 14px; text-align: right; }
     .qty-row input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px #1a73e820; }
-    .buy-cost { margin: 4px 0 18px; }
+    .buy-cost { margin: 4px 0; }
     table { width: 100%; border-collapse: collapse; }
     th { background: #e8f0fe; color: #174ea6; font-size: 12px; font-weight: 600;
          text-align: left; padding: 8px 12px; }
@@ -157,6 +173,7 @@ const UI = {
     <span id="qtyHint" class="hint" style="color:#80868b;font-size:12px"></span>
   </div>
   <div class="meta buy-cost">Buy cost: <b id="buyCost">—</b></div>
+  <div class="meta buy-cost">Difference: <b id="difference">—</b></div>
   <div class="meta buy-cost">Profit: <b id="profit">—</b></div>
 
   <table id="couponsTable">
@@ -180,6 +197,7 @@ const UI = {
   <script>
     const couponValues = [${coupons.map((c) => c.value || 0).join(',')}];
     const sellPrice = ${(bond && bond.sellPrice) || 0};
+    const faceValue = ${(bond && (bond.coupons || []).find((c) => c.type === 'Погашення')?.value) || 1000};
     const fmt = (v) => v.toLocaleString('uk-UA', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -193,6 +211,9 @@ const UI = {
       });
       const profit = (totalPayout - sellPrice) * qty;
       document.getElementById('buyCost').textContent = fmt(sellPrice * qty);
+      const differenceEl = document.getElementById('difference');
+      differenceEl.textContent = fmt((faceValue - sellPrice) * qty);
+      differenceEl.style.color = '#c5221f';
       const profitEl = document.getElementById('profit');
       profitEl.textContent = fmt(profit);
       profitEl.style.color = profit < 0 ? '#c5221f' : '#188038';

@@ -93,11 +93,18 @@ test('no first coupon: backward walk from maturity yields clean 6-month grid', (
         '2026-11-14',
         '2027-05-14',
     ]);
-    assert.ok(dates.every((d) => d.endsWith('-15') || d.endsWith('-14')), 'all dates aligned');
+    assert.ok(
+        dates.every((d) => d.endsWith('-15') || d.endsWith('-14')),
+        'all dates aligned',
+    );
 });
 
 test('quarterly schedule with clamped month-end stays aligned to maturity', () => {
     const dates = buildSchedule(new Date(2027, 5, 30), null, 3).map(iso);
     // Jun 30 -> Mar 30 -> Dec 30 ... (clamped to non-existent Mar 31 / Dec 31)
-    assert.deepEqual(dates.slice(-3), ['2026-12-29', '2027-03-29', '2027-06-29']);
+    assert.deepEqual(dates.slice(-3), [
+        '2026-12-29',
+        '2027-03-29',
+        '2027-06-29',
+    ]);
 });
